@@ -4,6 +4,17 @@ Git integration usable to store encrypted secrets in the git repository while ha
 
 Do not use this tool unless you understand the security implications. I am by no mean a security expert and this code hasn't been audited. Use at your own risk.
 
+## x- install notes
+
+If compiling fails with port's `libiconv` incompatibility error:
+
+```console
+$ RUSTFLAGS="-L /usr/lib -l iconv" cargo build --releas
+```
+
+Or on other systems, ensure the `port` library headers are available for compilation.
+
+
 ## Why should I use this?
 
 Short answer: you probably shouldn't. Before considering this approach, take a look at [SOPS](https://github.com/mozilla/sops) and [Hashicorp Vault](https://www.vaultproject.io/) if they are better suited for the problem at hand. **They have a clear security advantage** over `git-agecrypt`.

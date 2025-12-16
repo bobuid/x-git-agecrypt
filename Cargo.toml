@@ -1,27 +1,29 @@
 [package]
 name = "git-agecrypt"
-version = "0.2.0"
+version = "0.2.0-xa"
 edition = "2021"
+description = "Git encryption tool using age"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-age = { version = "0.10.0", features = [ "cli-common", "armor", "ssh", "plugin" ] }
-anyhow = { version = "1.0.52", features = ["backtrace"] }
+age = { version = "0.10.1", features = [ "cli-common", "armor", "ssh", "plugin" ] }
+# age = { version = "0.11.1", default-features = false, features = [ "armor", "ssh", "plugin" ] }
+anyhow = { version = "1.0.100", features = ["backtrace"] }
 blake3 = "1.3.3"
-clap = { version = "4.3.2", features = [ "derive" ] }
-env_logger = "0.11.3"
-git2 = { version = "0.18.2", default-features = false }
-log = "0.4.14"
-regex = "1.8.4"
-serde = { version = "1.0.133", features = [ "derive" ] }
-thiserror = "1.0.30"
-toml = "0.8.11"
+clap = { version = "4.5.53", features = [ "derive" ] }
+env_logger = "0.11.8"
+git2 = { version = "0.20.2", default-features = false }
+log = "0.4.29"
+regex = "1.12.2"
+serde = { version = "1.0.228", features = [ "derive" ] }
+thiserror = "2.0.17"
+toml = "0.9.8"
 
 [features]
 
 [dev-dependencies]
-assert_fs = "1.0.6"
+assert_fs = "1.1.3"
 assert_matches = "1.5.0"
-duct = "0.13.5"
-rstest = "0.18.2"
+duct = "0.13.6"
+rstest = "0.26.1"
