@@ -7,8 +7,7 @@ description = "Git encryption tool using age"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-age = { version = "0.10.1", features = [ "cli-common", "armor", "ssh", "plugin" ] }
-# age = { version = "0.11.1", default-features = false, features = [ "armor", "ssh", "plugin" ] }
+age = { git = "https://github.com/str4d/rage", default-features = false, features = [ "armor", "ssh", "plugin" ] }
 anyhow = { version = "1.0.100", features = ["backtrace"] }
 blake3 = "1.3.3"
 clap = { version = "4.5.53", features = [ "derive" ] }

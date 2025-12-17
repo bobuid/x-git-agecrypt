@@ -5,22 +5,42 @@ use std::{
 
 use age::{
     armor::ArmoredReader,
-    cli_common::{read_identities, StdinGuard, UiCallbacks},
     plugin::{self, RecipientPluginV1},
-    DecryptError, Decryptor, Encryptor, Identity, Recipient,
+    Callbacks, DecryptError, Decryptor, Encryptor, Identity, IdentityFile, Recipient,
 };
 use anyhow::{bail, Context, Result};
+
+/// Callbacks that do nothing - used when no interactive prompts are needed
+#[derive(Clone)]
+struct NoOpCallbacks;
+
+impl Callbacks for NoOpCallbacks {
+    fn display_message(&self, _message: &str) {}
+    fn confirm(&self, _message: &str, _yes_string: &str, _no_string: Option<&str>) -> Option<bool> {
+        None
+    }
+    fn request_public_string(&self, _description: &str) -> Option<String> {
+        None
+    }
+    fn request_passphrase(&self, _description: &str) -> Option<age::secrecy::SecretString> {
+        None
+    }
+}
 
 pub(crate) fn decrypt(
     identities: &[impl AsRef<Path>],
     encrypted: &mut impl Read,
 ) -> Result<Option<Vec<u8>>> {
     let id = load_identities(identities)?;
-    let id = id.iter().map(|i| i.as_ref() as &dyn Identity);
+    let id_refs = id.iter().map(|i| i.as_ref() as &dyn Identity);
     let mut decrypted = vec![];
     let decryptor = match Decryptor::new(ArmoredReader::new(encrypted)) {
-        Ok(Decryptor::Recipients(d)) => d,
-        Ok(Decryptor::Passphrase(_)) => bail!("Passphrase encrypted files are not supported"),
+        Ok(d) => {
+            if d.is_scrypt() {
+                bail!("Passphrase encrypted files are not supported");
+            }
+            d
+        }
         Err(DecryptError::InvalidHeader) => return Ok(None),
         Err(DecryptError::Io(e)) => {
             match e.kind() {
@@ -35,20 +55,28 @@ pub(crate) fn decrypt(
         }
     };
 
-    let mut reader = decryptor.decrypt(id)?;
+    let mut reader = decryptor.decrypt(id_refs.into_iter())?;
     reader.read_to_end(&mut decrypted)?;
     Ok(Some(decrypted))
 }
 
-fn load_identities(identities: &[impl AsRef<Path>]) -> Result<Vec<Box<dyn Identity>>> {
-    let id: Vec<String> = identities
-        .iter()
-        .map(|i| i.as_ref().to_string_lossy().into())
-        .collect();
-    let mut stdin_guard = StdinGuard::new(false);
-    let rv = read_identities(id.clone(), None, &mut stdin_guard)
-        .with_context(|| format!("Loading identities failed from paths: {:?}", id))?;
-    Ok(rv)
+fn load_identities(identities: &[impl AsRef<Path>]) -> Result<Vec<Box<dyn Identity + Send + Sync>>> {
+    let mut all_identities: Vec<Box<dyn Identity + Send + Sync>> = vec![];
+    
+    for path in identities {
+        let path = path.as_ref();
+        let identity_file = IdentityFile::from_file(path.to_string_lossy().to_string())
+            .with_context(|| format!("Failed to read identity file: {:?}", path))?;
+        
+        let file_identities = identity_file
+            .with_callbacks(NoOpCallbacks)
+            .into_identities()
+            .with_context(|| format!("Failed to parse identities from: {:?}", path))?;
+        
+        all_identities.extend(file_identities);
+    }
+    
+    Ok(all_identities)
 }
 
 pub(crate) fn encrypt(
@@ -56,8 +84,9 @@ pub(crate) fn encrypt(
     cleartext: &mut impl Read,
 ) -> Result<Vec<u8>> {
     let recipients = load_public_keys(public_keys)?;
+    let recipient_refs: Vec<&dyn Recipient> = recipients.iter().map(|r| r.as_ref() as &dyn Recipient).collect();
 
-    let encryptor = Encryptor::with_recipients(recipients).with_context(|| {
+    let encryptor = Encryptor::with_recipients(recipient_refs.into_iter()).with_context(|| {
         format!(
             "Couldn't load keys for recepients; public_keys={:?}",
             public_keys
@@ -86,10 +115,9 @@ fn load_public_keys(public_keys: &[impl AsRef<str>]) -> Result<Vec<Box<dyn Recip
             bail!("Invalid recipient");
         }
     }
-    let callbacks = UiCallbacks {};
 
     for plugin_name in plugin_recipients.iter().map(|r| r.plugin()) {
-        let recipient = RecipientPluginV1::new(plugin_name, &plugin_recipients, &[], callbacks)?;
+        let recipient = RecipientPluginV1::new(plugin_name, &plugin_recipients, &[], NoOpCallbacks)?;
         recipients.push(Box::new(recipient));
     }
 
@@ -102,7 +130,14 @@ pub(crate) fn validate_public_keys(public_keys: &[impl AsRef<str>]) -> Result<()
 }
 
 pub(crate) fn validate_identity(identity: impl AsRef<Path>) -> Result<()> {
-    let mut stdin_guard = StdinGuard::new(false);
-    read_identities(vec![identity.as_ref().to_string_lossy().into()], None, &mut stdin_guard)?;
+    let path = identity.as_ref();
+    let identity_file = IdentityFile::from_file(path.to_string_lossy().to_string())
+        .with_context(|| format!("Failed to read identity file: {:?}", path))?;
+    
+    identity_file
+        .with_callbacks(NoOpCallbacks)
+        .into_identities()
+        .with_context(|| format!("Failed to parse identity from: {:?}", path))?;
+    
     Ok(())
 }
