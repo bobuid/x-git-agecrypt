@@ -1,0 +1,5 @@
+telemetry = false
+[install]
+
+[run]
+shell = "bun"

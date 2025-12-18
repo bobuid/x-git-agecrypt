@@ -1,0 +1,52 @@
+{
+  "name": "x-git-agecrypt.monorepo",
+  "version": "0.2512.1-a",
+  "private": false,
+  "#useful": {
+    "status": "git-agecrypt status",
+    "init": "git-agecrypt init",
+    "add": "git-agecrypt config add -r age... -p test/test.md",
+    "test": "git-agecrypt textconv test/test.md",
+    "help": "git-agecrypt config add -i ~/identities.age",
+    "age:create-identity": "age-keygen | age -p -a > ~/identity.age; chmod 600 ~/identities.age",
+    "get-key:linux": "secret-tool lookup application age identity-file ~/identities.age",
+    "add-key:linux": "secret-tool store --label=\"my#2607 Age Identity Passphrase\" application age identity-file ~/identities.age",
+    "export:linux": "export AGE_SECRET_KEY=$(secret-tool lookup application age identity-file ~/identities.age)",
+    "remove-key:linux": "secret-tool clear --label=\"my#2607 Age Identity Passphrase\"",
+    "list-keys:linux": "secret-tool search application age"
+  },
+  "scripts": {
+    "build": "cargo build --release",
+    "build:debug": "cargo build",
+    "clean": "cargo clean",
+    "test": "cargo test",
+    "fmt": "cargo fmt",
+    "clippy": "cargo clippy --all-targets --all-features -- -D warnings"
+  },
+  "dependencies": {
+  },
+  "devDependencies": {
+    "@clack/prompts": "latest",
+    "@types/bun": "latest"
+  },
+  "packageManager": "bun@1.3.5",
+  "engines": {
+    "node": ">=24",
+    "bun": "^1.3",
+    "pnpm": "please-use-bun",
+    "npm": "please-use-bun",
+    "yarn": "please-use-bun"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "onFail": "error"
+    },
+    "packageManager": {
+      "name": "bun",
+      "onFail": "warn"
+    }
+  },
+  "workspaces": [
+  ]
+}
