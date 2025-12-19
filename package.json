@@ -33,6 +33,9 @@
     "playground-module:update": "git submodule update --remote --recursive",
     "playground-module:push": "git submodule foreach --recursive 'git push origin HEAD:main'"
   },
+  "#TODOs": [
+    "presence of .gitattributes in the repo is not checked, and that makes the encryption/hooks not working at all and silently let stuff be published in plain."
+  ],
   "dependencies": {
   },
   "devDependencies": {

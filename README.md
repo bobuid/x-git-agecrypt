@@ -1,4 +1,4 @@
-# git-agecrypt
+# git-agecrypt (with x- fixes)
 
 Git integration usable to store encrypted secrets in the git repository while having the plaintext available in the working tree. An alternative to [git-crypt](https://github.com/AGWA/git-crypt) using [age](https://age-encryption.org) instead of GPG.
 
