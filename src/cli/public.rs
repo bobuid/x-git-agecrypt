@@ -70,10 +70,16 @@ impl<C: Context> CommandContext<C> {
         let padding = identities.iter().map(|i| i.path.len()).max().unwrap_or(0);
         println!("The following identities are currently configured:");
         for i in &identities {
-            if let Err(err) = i.validate() {
-                println!("    ⨯ {:padding$} -- {:?}", i.path, err, padding = padding);
-            } else {
-                println!("    ✓ {}", i.path);
+            match i.validate() {
+                Err(err) => {
+                    println!("    ⨯ {:padding$} -- {:?}", i.path, err, padding = padding);
+                }
+                Ok(Some(note)) => {
+                    println!("    ✓ {:padding$} -- {}", i.path, note, padding = padding);
+                }
+                Ok(None) => {
+                    println!("    ✓ {}", i.path);
+                }
             }
         }
         Ok(())

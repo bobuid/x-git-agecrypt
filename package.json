@@ -21,13 +21,17 @@
   },
   "scripts": {
     "build": "cargo build --release",
+    "deploy": "cp target/release/git-agecrypt ~/.local/bin/",
+    "# If compiling fails with port's `libiconv` incompatibility error:": "//",
+    "build:mac1": "RUSTFLAGS=\"-L /usr/lib -l iconv\" cargo build --release",
     "build:debug": "cargo build",
     "clean": "cargo clean",
     "test": "cargo test",
     "fmt": "cargo fmt",
     "clippy": "cargo clippy --all-targets --all-features -- -D warnings",
     "playground-module:init": "git submodule update --init --recursive",
-    "playground-module:update": "git submodule update --remote --recursive"
+    "playground-module:update": "git submodule update --remote --recursive",
+    "playground-module:push": "git submodule foreach --recursive 'git push origin HEAD:main'"
   },
   "dependencies": {
   },

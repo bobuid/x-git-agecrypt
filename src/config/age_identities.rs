@@ -29,7 +29,7 @@ impl Display for AgeIdentity {
 }
 
 impl Validated for AgeIdentity {
-    fn validate(&self) -> Result<()> {
+    fn validate(&self) -> Result<Option<String>> {
         Ok(crate::age::validate_identity(&self.path)
             .with_context(|| format!("The file '{}' is not a valid age identity", self.path))?)
     }

@@ -206,7 +206,10 @@ pub(crate) fn validate_public_keys(public_keys: &[impl AsRef<str>]) -> Result<()
     Ok(())
 }
 
-pub(crate) fn validate_identity(identity: impl AsRef<Path>) -> Result<()> {
+/// Validates an identity file.
+/// Returns Ok(None) for valid plaintext identities or decrypted encrypted identities.
+/// Returns Ok(Some(note)) with a note for encrypted identities when AGE_PASSPHRASE is not set.
+pub(crate) fn validate_identity(identity: impl AsRef<Path>) -> Result<Option<String>> {
     let path = identity.as_ref();
     let path_str = path.to_string_lossy().to_string();
     
@@ -217,47 +220,53 @@ pub(crate) fn validate_identity(identity: impl AsRef<Path>) -> Result<()> {
                 .with_callbacks(IdentityCallbacks)
                 .into_identities()
                 .with_context(|| format!("Failed to parse identity from: {:?}", path))?;
-            Ok(())
+            Ok(None)
         }
         Err(_) => {
-            // Try as encrypted identity file - validate it can be decrypted
+            // Try as encrypted identity file
             let file = File::open(path)
                 .with_context(|| format!("Failed to open identity file: {:?}", path))?;
             let reader = ArmoredReader::new(BufReader::new(file));
             
-            // Check if it's a passphrase-encrypted file
+            // Check if it's a valid encrypted file
             let decryptor = match Decryptor::new(reader) {
                 Ok(d) if d.is_scrypt() => d,
                 Ok(_) => bail!("Encrypted identity file {:?} is not passphrase-encrypted", path),
-                Err(e) => bail!("Failed to parse encrypted identity file {:?}: {}", path, e),
+                Err(e) => bail!("File {:?} is neither a valid plaintext nor encrypted identity file: {}", path, e),
             };
             
-            // Get passphrase from environment
-            let passphrase = env::var(AGE_PASSPHRASE_ENV)
-                .with_context(|| format!("AGE_PASSPHRASE environment variable not set, needed to decrypt {:?}", path))?;
-            
-            // Decrypt and validate the identity file
-            let decrypted = {
-                let mut reader = decryptor.decrypt(std::iter::once(
-                    &age::scrypt::Identity::new(passphrase.into()) as &dyn Identity
-                ))?;
-                let mut buf = Vec::new();
-                reader.read_to_end(&mut buf)?;
-                buf
-            };
-            
-            let decrypted_str = String::from_utf8(decrypted)
-                .with_context(|| format!("Decrypted identity file {:?} is not valid UTF-8", path))?;
-            
-            let identity_file = IdentityFile::from_buffer(decrypted_str.as_bytes())
-                .with_context(|| format!("Failed to parse decrypted identity file {:?}", path))?;
-            
-            identity_file
-                .with_callbacks(IdentityCallbacks)
-                .into_identities()
-                .with_context(|| format!("Failed to load identities from decrypted {:?}", path))?;
-            
-            Ok(())
+            // If AGE_PASSPHRASE is set, try to decrypt and validate
+            // Otherwise, just accept that it's a valid encrypted format
+            match env::var(AGE_PASSPHRASE_ENV) {
+                Ok(passphrase) => {
+                    // Decrypt and validate the identity file
+                    let decrypted = {
+                        let mut reader = decryptor.decrypt(std::iter::once(
+                            &age::scrypt::Identity::new(passphrase.into()) as &dyn Identity
+                        )).with_context(|| format!("Failed to decrypt {:?} with AGE_PASSPHRASE", path))?;
+                        let mut buf = Vec::new();
+                        reader.read_to_end(&mut buf)?;
+                        buf
+                    };
+                    
+                    let decrypted_str = String::from_utf8(decrypted)
+                        .with_context(|| format!("Decrypted identity file {:?} is not valid UTF-8", path))?;
+                    
+                    let identity_file = IdentityFile::from_buffer(decrypted_str.as_bytes())
+                        .with_context(|| format!("Failed to parse decrypted identity file {:?}", path))?;
+                    
+                    identity_file
+                        .with_callbacks(IdentityCallbacks)
+                        .into_identities()
+                        .with_context(|| format!("Failed to load identities from decrypted {:?}", path))?;
+                    
+                    Ok(None)
+                }
+                Err(_) => {
+                    // No passphrase set - just validate format, don't require decryption
+                    Ok(Some("encrypted, AGE_PASSPHRASE not detected, decryption was not tested".to_string()))
+                }
+            }
         }
     }
 }

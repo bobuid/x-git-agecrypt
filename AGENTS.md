@@ -46,6 +46,7 @@ This document contains strictly prescriptive rules for generative coding agents.
 
 ### Playground
 - Playground files belong in the `[dev]/playground` folder
+- Playground is a valid separate git repository (submodule) to test our git-agecrypt tool
 - Keep playground code isolated and self-contained
 - Don't commit playground files to version control, it has its own git submodule thing
 

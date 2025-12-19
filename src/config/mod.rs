@@ -21,7 +21,8 @@ pub enum Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub(crate) trait Validated {
-    fn validate(&self) -> Result<()>;
+    /// Validates the item. Returns Ok with an optional note/comment about the validation.
+    fn validate(&self) -> Result<Option<String>>;
 }
 
 pub(crate) trait Container {
