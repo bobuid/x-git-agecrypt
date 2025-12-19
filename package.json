@@ -2,6 +2,10 @@
   "name": "x-git-agecrypt.monorepo",
   "version": "0.2512.1-a",
   "private": false,
+  "#readme": [
+    "The follwing effectively working commands under the 'scripts' section you are supposed to use like 'bun run build'",
+    "Otherwise just copy the commands from the 'scripts' section to your terminal"
+  ],
   "#useful": {
     "status": "git-agecrypt status",
     "init": "git-agecrypt init",
@@ -21,7 +25,9 @@
     "clean": "cargo clean",
     "test": "cargo test",
     "fmt": "cargo fmt",
-    "clippy": "cargo clippy --all-targets --all-features -- -D warnings"
+    "clippy": "cargo clippy --all-targets --all-features -- -D warnings",
+    "playground-module:init": "git submodule update --init --recursive",
+    "playground-module:update": "git submodule update --remote --recursive"
   },
   "dependencies": {
   },

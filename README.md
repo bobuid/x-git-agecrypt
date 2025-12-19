@@ -6,6 +6,11 @@ Do not use this tool unless you understand the security implications. I am by no
 
 ## x- install notes
 
+### Commands to use
+See `package.json` for useful commands. 
+
+### macOS
+
 If compiling fails with port's `libiconv` incompatibility error:
 
 ```console
