@@ -4,6 +4,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use glob::Pattern;
+
 use anyhow::{anyhow, Context};
 use serde::{Deserialize, Serialize};
 
@@ -58,19 +60,21 @@ impl AppConfig {
 
     pub fn add(&mut self, recipients: Vec<String>, paths: Vec<PathBuf>) -> Result<()> {
         age::validate_public_keys(&recipients)?;
-        let invalid_paths: Vec<String> = paths
-            .iter()
-            .filter(|&p| !p.is_file())
-            .map(|f| f.to_string_lossy().to_string())
-            .collect();
-        if !invalid_paths.is_empty() {
-            return Err(anyhow!(
-                "The follwing files doesn't exist: {}",
-                invalid_paths.join(", ")
-            )
-            .into());
-        }
+        
         for path in paths {
+            let path_str = path.to_string_lossy();
+            let is_glob = path_str.contains('*') || path_str.contains('?') || path_str.contains('[');
+            let is_dir = path.is_dir();
+            let is_file = path.is_file();
+            
+            if !is_glob && !is_dir && !is_file {
+                return Err(anyhow!(
+                    "Path doesn't exist and is not a valid glob pattern: {}",
+                    path.display()
+                )
+                .into());
+            }
+            
             let entry = self.config.entry(path).or_default();
             entry.extend(recipients.clone().into_iter());
             entry.dedup();
@@ -112,15 +116,36 @@ impl AppConfig {
     }
 
     pub fn get_public_keys(&self, path: &Path) -> Result<&[String]> {
-        let pubk = self
-            .config
-            .get(path.strip_prefix(&self.prefix).with_context(|| {
-                format!(
-                    "Not a path inside git repository, path={path:?}, repo={:?}",
-                    self.prefix
-                )
-            })?)
-            .with_context(|| format!("No public key can be found for '{}'", path.display()))?;
-        Ok(&pubk[..])
+        let relpath = path.strip_prefix(&self.prefix).with_context(|| {
+            format!(
+                "Not a path inside git repository, path={path:?}, repo={:?}",
+                self.prefix
+            )
+        })?;
+        
+        // Try exact match first
+        if let Some(keys) = self.config.get(relpath) {
+            return Ok(&keys[..]);
+        }
+        
+        // Try folder prefix or glob pattern matching
+        for (pattern, keys) in &self.config {
+            let pattern_str = pattern.to_string_lossy();
+            let relpath_str = relpath.to_string_lossy();
+            
+            // Check if pattern is a directory prefix (e.g., "protected/" matches "protected/secret.md")
+            if relpath.starts_with(pattern) {
+                return Ok(&keys[..]);
+            }
+            
+            // Check glob pattern match (e.g., "protected/*" or "**/*.md")
+            if let Ok(glob_pattern) = Pattern::new(&pattern_str) {
+                if glob_pattern.matches(&relpath_str) {
+                    return Ok(&keys[..]);
+                }
+            }
+        }
+        
+        Err(anyhow!("No public key can be found for '{}'", path.display()).into())
     }
 }
