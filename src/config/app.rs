@@ -22,6 +22,8 @@ pub struct RecipientEntry {
 #[derive(Serialize, Deserialize)]
 pub struct AppConfig {
     #[serde(default)]
+    passphrase: HashMap<String, String>,
+    #[serde(default)]
     aliases: HashMap<String, String>,
     config: HashMap<PathBuf, Vec<String>>,
     #[serde(skip)]
@@ -42,6 +44,7 @@ impl AppConfig {
                 Ok(cfg)
             }
             Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(Self {
+                passphrase: HashMap::new(),
                 aliases: HashMap::new(),
                 config: HashMap::new(),
                 path: path.into(),
@@ -116,6 +119,14 @@ impl AppConfig {
             }
         }
         rv
+    }
+
+    pub fn get_passphrase_command(&self, key: &str) -> Option<&String> {
+        self.passphrase.get(key)
+    }
+
+    pub fn has_passphrase_key(&self, key: &str) -> bool {
+        self.passphrase.contains_key(key)
     }
 
     fn resolve_recipient(&self, key: &str) -> String {

@@ -6,6 +6,10 @@ use clap::{ArgGroup, Parser, Subcommand};
 #[derive(Parser)]
 #[clap(author, version, about)]
 pub struct Args {
+    /// Passphrase getter key from [passphrase] section in git-agecrypt.toml
+    #[arg(short = 'g', long = "getter")]
+    pub passphrase_getter: Option<String>,
+
     #[clap(subcommand)]
     pub command: Commands,
 }
