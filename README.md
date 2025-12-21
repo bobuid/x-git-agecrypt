@@ -128,12 +128,29 @@ $ git-agecrypt -g macos config list -r
 $ git-agecrypt status
 ```
 
-**Triggers:**
+**Triggers (priority order):**
 
-1. **Explicit `-g <key>`**: Uses the specified key from `[passphrase]` section
-2. **Implicit `sops`**: If no `-g` argument but `sops` key exists in config, uses it automatically
+1. **`-g <key>` argument** (highest priority): Uses the specified key from `[passphrase]` section
+2. **`AGE_PASSPHRASE_GETTER` env var**: 
+   - If set to a non-empty value: uses that value as the getter key
+   - If set to empty string: suppresses the implicit `sops` check (useful to disable auto-getter)
+3. **Implicit `sops`** (lowest priority): If no `-g` argument and no env var, but `sops` key exists in config, uses it automatically
 
-**How it works:**
+**Using AGE_PASSPHRASE_GETTER env var:**
+
+This is useful when git-agecrypt is invoked by other tools (IDE, git hooks) where you can't pass `-g`:
+
+```console
+# Use 'linux' getter for all git-agecrypt invocations in this session
+$ export AGE_PASSPHRASE_GETTER=linux
+$ windsurf-next      # IDE will use linux getter when git-agecrypt runs
+$ git pull           # git hooks will use linux getter
+
+# Suppress automatic sops getter (empty value)
+$ AGE_PASSPHRASE_GETTER= git pull
+```
+
+**How -g feature works:**
 
 - The command is executed via `sh -c` (supports pipes and complex shell commands)
 - Output is trimmed and set as `AGE_PASSPHRASE` for the duration of git-agecrypt's execution

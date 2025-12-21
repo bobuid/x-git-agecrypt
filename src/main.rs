@@ -24,24 +24,74 @@ fn main() -> Result<()> {
     run(args, ctx)
 }
 
+const AGE_PASSPHRASE_GETTER_ENV: &str = "AGE_PASSPHRASE_GETTER";
+
+/// Tracks how the passphrase getter was triggered (for error messages)
+#[derive(Clone, Copy)]
+enum GetterSource {
+    Arg,
+    EnvVar,
+    ImplicitSops,
+}
+
+impl std::fmt::Display for GetterSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GetterSource::Arg => write!(f, "-g argument"),
+            GetterSource::EnvVar => write!(f, "{} env var", AGE_PASSPHRASE_GETTER_ENV),
+            GetterSource::ImplicitSops => write!(f, "implicit sops key in [passphrase] section"),
+        }
+    }
+}
+
 fn resolve_passphrase(args: &cli::Args, repo: &impl Repository) -> Result<()> {
     // Load config to check [passphrase] section
     let cfg = AppConfig::load(&PathBuf::from("git-agecrypt.toml"), repo.workdir())?;
 
-    // Determine which key to use:
-    // 1. Explicit -g <key> argument
-    // 2. Implicit "sops" key if present in config
-    let getter_key = args.passphrase_getter.as_deref()
-        .or_else(|| cfg.has_passphrase_key("sops").then_some("sops"));
+    // Determine which key to use (priority order):
+    // 1. Explicit -g <key> argument (highest priority)
+    // 2. AGE_PASSPHRASE_GETTER env var:
+    //    - if not present: fall through to check sops
+    //    - if empty: suppress sops check (return early)
+    //    - if non-empty: use its value as getter key
+    // 3. Implicit "sops" key if present in config (lowest priority)
+    let (getter_key, source): (Option<String>, Option<GetterSource>) = if let Some(ref key) = args.passphrase_getter {
+        // -g argument takes highest priority
+        (Some(key.clone()), Some(GetterSource::Arg))
+    } else {
+        // Check AGE_PASSPHRASE_GETTER env var
+        match std::env::var(AGE_PASSPHRASE_GETTER_ENV) {
+            Ok(env_value) => {
+                if env_value.is_empty() {
+                    // Empty value = suppress sops, do nothing
+                    log::debug!("{} is set but empty, suppressing default sops getter", AGE_PASSPHRASE_GETTER_ENV);
+                    return Ok(());
+                } else {
+                    // Non-empty value = use as getter key
+                    log::debug!("Using getter key from {}: {}", AGE_PASSPHRASE_GETTER_ENV, env_value);
+                    (Some(env_value), Some(GetterSource::EnvVar))
+                }
+            }
+            Err(_) => {
+                // Env var not set, fall through to sops check
+                if cfg.has_passphrase_key("sops") {
+                    (Some("sops".to_string()), Some(GetterSource::ImplicitSops))
+                } else {
+                    (None, None)
+                }
+            }
+        }
+    };
 
-    let Some(key) = getter_key else {
+    let (Some(key), Some(source)) = (getter_key, source) else {
         return Ok(());
     };
 
-    let command = cfg.get_passphrase_command(key).ok_or_else(|| {
+    let command = cfg.get_passphrase_command(&key).ok_or_else(|| {
         anyhow::anyhow!(
-            "Passphrase getter '{}' not found in [passphrase] section of git-agecrypt.toml",
-            key
+            "Passphrase getter '{}' not found in [passphrase] section of git-agecrypt.toml (triggered by {})",
+            key,
+            source
         )
     })?;
 
@@ -54,12 +104,8 @@ fn resolve_passphrase(args: &cli::Args, repo: &impl Repository) -> Result<()> {
         .output()
         .with_context(|| {
             format!(
-                "Failed to execute passphrase command ({}): {}",
-                if args.passphrase_getter.is_some() {
-                    format!("-g {}", key)
-                } else {
-                    "implicit sops key".to_string()
-                },
+                "Failed to execute passphrase command (triggered by {})\nCommand: {}",
+                source,
                 command
             )
         })?;
@@ -67,11 +113,7 @@ fn resolve_passphrase(args: &cli::Args, repo: &impl Repository) -> Result<()> {
     if !output.status.success() {
         bail!(
             "Passphrase command failed (triggered by {})\nCommand: {}\nExit code: {}\nstderr: {}",
-            if args.passphrase_getter.is_some() {
-                format!("-g {}", key)
-            } else {
-                "implicit sops key in [passphrase] section".to_string()
-            },
+            source,
             command,
             output.status,
             String::from_utf8_lossy(&output.stderr)
@@ -83,11 +125,7 @@ fn resolve_passphrase(args: &cli::Args, repo: &impl Repository) -> Result<()> {
         .with_context(|| {
             format!(
                 "Passphrase command output is not valid UTF-8 (triggered by {})\nCommand: {}",
-                if args.passphrase_getter.is_some() {
-                    format!("-g {}", key)
-                } else {
-                    "implicit sops key".to_string()
-                },
+                source,
                 command
             )
         })?
@@ -97,11 +135,7 @@ fn resolve_passphrase(args: &cli::Args, repo: &impl Repository) -> Result<()> {
     if passphrase.is_empty() {
         bail!(
             "Passphrase command returned empty output (triggered by {})\nCommand: {}",
-            if args.passphrase_getter.is_some() {
-                format!("-g {}", key)
-            } else {
-                "implicit sops key in [passphrase] section".to_string()
-            },
+            source,
             command
         );
     }
