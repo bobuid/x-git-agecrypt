@@ -102,6 +102,68 @@ Then configure it:
 $ git-agecrypt config add -i ~/bob.identity
 ```
 
+#### Passphrase Getter (-g)
+
+Instead of setting `AGE_PASSPHRASE` manually in your environment, you can configure git-agecrypt to obtain the passphrase from an external command. This keeps the passphrase ephemeral and avoids exposing it in shell history or environment listings.
+
+**Configuration:**
+
+Add a `[passphrase]` section to `git-agecrypt.toml`:
+
+```toml
+[passphrase]
+sops = "sops -d --extract '[\"age_passphrase\"]' secrets.enc.yaml"
+linux = "secret-tool lookup application age identity-file ./bobs.identity"
+macos = "security find-generic-password -a age -s identity-passphrase -w"
+```
+
+**Usage:**
+
+```console
+# Explicit: use a specific getter key
+$ git-agecrypt -g linux status
+$ git-agecrypt -g macos config list -r
+
+# Implicit: if 'sops' key exists, it's used automatically
+$ git-agecrypt status
+```
+
+**Triggers:**
+
+1. **Explicit `-g <key>`**: Uses the specified key from `[passphrase]` section
+2. **Implicit `sops`**: If no `-g` argument but `sops` key exists in config, uses it automatically
+
+**How it works:**
+
+- The command is executed via `sh -c` (supports pipes and complex shell commands)
+- Output is trimmed and set as `AGE_PASSPHRASE` for the duration of git-agecrypt's execution
+- Clear error messages if command fails or returns empty output
+
+**Example with secret-tool (Linux):**
+
+```console
+# Store passphrase in GNOME Keyring
+$ secret-tool store --label="Age Identity" application age identity-file ./bobs.identity
+
+# Configure getter
+$ cat git-agecrypt.toml
+[passphrase]
+linux = "secret-tool lookup application age identity-file ./bobs.identity"
+
+# Use it
+$ git-agecrypt -g linux status
+```
+
+## Current CLI structure
+
+git-agecrypt init
+git-agecrypt status
+git-agecrypt config add -r ... -p ...
+git-agecrypt config remove -r ... -p ...
+git-agecrypt config list -i/-r
+git-agecrypt deinit
+(hidden) clean, smudge, textconv for git filters
+
 ## Why should I use this?
 
 Short answer: you probably shouldn't. Before considering this approach, take a look at [SOPS](https://github.com/mozilla/sops) and [Hashicorp Vault](https://www.vaultproject.io/) if they are better suited for the problem at hand. **They have a clear security advantage** over `git-agecrypt`.
