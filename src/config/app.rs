@@ -21,6 +21,8 @@ pub struct RecipientEntry {
 
 #[derive(Serialize, Deserialize)]
 pub struct AppConfig {
+    #[serde(default)]
+    aliases: HashMap<String, String>,
     config: HashMap<PathBuf, Vec<String>>,
     #[serde(skip)]
     path: PathBuf,
@@ -40,6 +42,7 @@ impl AppConfig {
                 Ok(cfg)
             }
             Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(Self {
+                aliases: HashMap::new(),
                 config: HashMap::new(),
                 path: path.into(),
                 prefix: repo_prefix.into(),
@@ -115,7 +118,15 @@ impl AppConfig {
         rv
     }
 
-    pub fn get_public_keys(&self, path: &Path) -> Result<&[String]> {
+    fn resolve_recipient(&self, key: &str) -> String {
+        self.aliases.get(key).cloned().unwrap_or_else(|| key.to_string())
+    }
+
+    fn resolve_recipients(&self, keys: &[String]) -> Vec<String> {
+        keys.iter().map(|k| self.resolve_recipient(k)).collect()
+    }
+
+    pub fn get_public_keys(&self, path: &Path) -> Result<Vec<String>> {
         let relpath = path.strip_prefix(&self.prefix).with_context(|| {
             format!(
                 "Not a path inside git repository, path={path:?}, repo={:?}",
@@ -125,7 +136,7 @@ impl AppConfig {
         
         // Try exact match first
         if let Some(keys) = self.config.get(relpath) {
-            return Ok(&keys[..]);
+            return Ok(self.resolve_recipients(keys));
         }
         
         // Try folder prefix or glob pattern matching
@@ -135,13 +146,13 @@ impl AppConfig {
             
             // Check if pattern is a directory prefix (e.g., "protected/" matches "protected/secret.md")
             if relpath.starts_with(pattern) {
-                return Ok(&keys[..]);
+                return Ok(self.resolve_recipients(keys));
             }
             
             // Check glob pattern match (e.g., "protected/*" or "**/*.md")
             if let Ok(glob_pattern) = Pattern::new(&pattern_str) {
                 if glob_pattern.matches(&relpath_str) {
-                    return Ok(&keys[..]);
+                    return Ok(self.resolve_recipients(keys));
                 }
             }
         }
