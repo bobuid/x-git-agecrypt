@@ -4,12 +4,12 @@ Git integration usable to store encrypted secrets in the git repository while ha
 
 Do not use this tool unless you understand the security implications. I am by no mean a security expert and this code hasn't been audited. Use at your own risk.
 
-## x- install notes
+## x- enahancements
 
 ### Commands to use
 See `package.json` for useful commands. 
 
-### macOS
+### macOS install notes
 
 If compiling fails with port's `libiconv` incompatibility error:
 
@@ -36,6 +36,71 @@ alice = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI...'
 ```
 
 Aliases are resolved transparently before encryption. Both aliases and direct keys (Age keys, ed25519 SSH keys, Age plugin stubs) can be mixed in the same recipient array. If a recipient string doesn't match any alias, it's passed through as-is.
+
+#### Folder and Glob Patterns
+
+The `[config]` section supports folder prefixes and glob patterns, not just exact file paths. This allows mapping recipients to multiple files with a single entry.
+
+**Matching order:**
+1. Exact path match (checked first)
+2. Directory prefix (e.g., `"protected"` matches `protected/secret.md`)
+3. Glob pattern (e.g., `"**/*.md"` matches any `.md` file recursively)
+
+**Examples:**
+
+```toml
+[config]
+"secrets/api-key.txt" = ['bob']       # exact file
+"protected" = ['alice']               # all files under protected/
+"protected/*.md" = ['bob', 'alice']   # .md files in protected/ (not recursive)
+"**/*.env" = ['bob']                  # all .env files recursively
+```
+
+**Note:** When adding paths via CLI, the path must exist or be a valid glob pattern:
+
+```console
+$ git-agecrypt config add -r "age1..." -p "secrets/**"
+```
+
+#### Encrypted Identity Files (AGE_PASSPHRASE)
+
+git-agecrypt supports passphrase-protected (encrypted) identity files for decryption operations. This enables secure storage of private keys while allowing automated usage in CI/CD pipelines and scripts.
+
+**Usage:**
+
+```console
+$ AGE_PASSPHRASE='your-passphrase' git pull
+$ AGE_PASSPHRASE='your-passphrase' git-agecrypt status
+$ AGE_PASSPHRASE='your-passphrase' bun run status
+$ AGE_PASSPHRASE='your-passphrase' smerge
+$ AGE_PASSPHRASE='your-passphrase' windsurf-next
+```
+
+**Behavior:**
+
+| Identity type | AGE_PASSPHRASE set | Result |
+|---------------|-------------------|--------|
+| Plaintext | N/A | Parsed and used directly |
+| Encrypted | Yes | Decrypted with passphrase, then used |
+| Encrypted | No | Encryption works, decryption fails with clear error |
+
+**Status command:**
+
+When running `git-agecrypt status`, encrypted identities show their validation state:
+- With `AGE_PASSPHRASE`: fully validated (decryption tested)
+- Without `AGE_PASSPHRASE`: format validated only, with note: *"encrypted, AGE_PASSPHRASE not detected, decryption was not tested"*
+
+**Creating encrypted identity files:**
+
+```console
+$ age-keygen | age -p -a > ~/bob.identity
+```
+
+Then configure it:
+
+```console
+$ git-agecrypt config add -i ~/bob.identity
+```
 
 ## Why should I use this?
 
