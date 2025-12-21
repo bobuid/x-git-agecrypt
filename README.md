@@ -19,6 +19,23 @@ $ RUSTFLAGS="-L /usr/lib -l iconv" cargo build --release
 
 Or on other systems, ensure the `port` library headers are available for compilation.
 
+### New features 
+
+#### Aliases
+
+Instead of using long cryptographic keys directly in `git-agecrypt.toml`, you can define human-readable aliases in the `[aliases]` section and reference them in your `[config]` entries.
+
+```toml
+[aliases]
+bob = 'age1xgrjk6eyckfkj85zac7jzhwusagj0vh77y64pk0tpczs5qgjmvdswgmjyq'
+alice = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI...'
+
+[config]
+"secrets/**" = ['bob', 'alice']
+"protected/*.md" = ['bob']
+```
+
+Aliases are resolved transparently before encryption. Both aliases and direct keys (Age keys, ed25519 SSH keys, Age plugin stubs) can be mixed in the same recipient array. If a recipient string doesn't match any alias, it's passed through as-is.
 
 ## Why should I use this?
 
