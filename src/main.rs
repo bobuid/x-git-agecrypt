@@ -75,10 +75,12 @@ fn resolve_passphrase(args: &cli::Args, repo: &impl Repository) -> Result<()> {
                 }
             }
             Err(_) => {
-                // Env var not set, check OS-specific key first
-                let os_key = if cfg!(target_os = "macos") { "macos" }
-                             else if cfg!(target_os = "linux") { "linux" }
-                             else { "" };
+                // Env var not set, check OS-specific key first (runtime detection)
+                let os_key = match std::env::consts::OS {
+                    "macos" => "macos",
+                    "linux" => "linux",
+                    _ => "",
+                };
 
                 if !os_key.is_empty() && cfg.has_passphrase_key(os_key) {
                     (Some(os_key.to_string()), Some(GetterSource::ImplicitOs))
