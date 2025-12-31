@@ -60,6 +60,7 @@ The `[config]` section supports folder prefixes and glob patterns, not just exac
 
 ```console
 $ git-agecrypt config add -r "age1..." -p "secrets/**"
+$ git-agecrypt textconv secrets/<filename>.md
 ```
 
 #### Encrypted Identity Files (AGE_PASSPHRASE)
@@ -113,7 +114,7 @@ Add a `[passphrase]` section to `git-agecrypt.toml`:
 ```toml
 [passphrase]
 sops = "sops -d --extract '[\"age_passphrase\"]' secrets.enc.yaml"
-linux = "secret-tool lookup application age identity-file ./bobs.identity"
+linux = "secret-tool lookup application age identity-file $HOME/.roaming/bobs.identity"
 macos = "security find-generic-password -a age -s identity-passphrase -w"
 ```
 
@@ -124,7 +125,10 @@ macos = "security find-generic-password -a age -s identity-passphrase -w"
 $ git-agecrypt -g linux status
 $ git-agecrypt -g macos config list -r
 
-# Implicit: if 'sops' key exists, it's used automatically
+# Automatic: OS is detected, uses 'macos' on macOS or 'linux' on Linux
+$ git-agecrypt status
+
+# Fallback: if no OS-specific key, uses 'sops' key automatically
 $ git-agecrypt status
 ```
 
@@ -133,8 +137,9 @@ $ git-agecrypt status
 1. **`-g <key>` argument** (highest priority): Uses the specified key from `[passphrase]` section
 2. **`AGE_PASSPHRASE_GETTER` env var**: 
    - If set to a non-empty value: uses that value as the getter key
-   - If set to empty string: suppresses the implicit `sops` check (useful to disable auto-getter)
-3. **Implicit `sops`** (lowest priority): If no `-g` argument and no env var, but `sops` key exists in config, uses it automatically
+   - If set to empty string: suppresses auto-detection (useful to disable auto-getter)
+3. **Implicit OS-specific key**: Auto-detects OS and uses `macos` key on macOS or `linux` key on Linux if present
+4. **Implicit `sops`** (lowest priority): If no OS-specific key exists but `sops` key does, uses it automatically
 
 **Using AGE_PASSPHRASE_GETTER env var:**
 
@@ -159,13 +164,14 @@ $ AGE_PASSPHRASE_GETTER= git pull
 **Example with secret-tool (Linux):**
 
 ```console
-# Store passphrase in GNOME Keyring
-$ secret-tool store --label="Age Identity" application age identity-file ./bobs.identity
+# Store passphrase in GNOME Keyring:
+$ secret-tool store --label="Age Identity" application age identity-file $HOME/.roaming/bobs.identity
 
 # Configure getter
 $ cat git-agecrypt.toml
 [passphrase]
-linux = "secret-tool lookup application age identity-file ./bobs.identity"
+linux = "secret-tool lookup application age identity-file $HOME/.roaming/bobs.identity"
+macos = "security find-generic-password -a age -s $HOME/.roaming/bobs.identity -w"
 
 # Use it
 $ git-agecrypt -g linux status

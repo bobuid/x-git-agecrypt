@@ -31,6 +31,7 @@ const AGE_PASSPHRASE_GETTER_ENV: &str = "AGE_PASSPHRASE_GETTER";
 enum GetterSource {
     Arg,
     EnvVar,
+    ImplicitOs,
     ImplicitSops,
 }
 
@@ -39,6 +40,7 @@ impl std::fmt::Display for GetterSource {
         match self {
             GetterSource::Arg => write!(f, "-g argument"),
             GetterSource::EnvVar => write!(f, "{} env var", AGE_PASSPHRASE_GETTER_ENV),
+            GetterSource::ImplicitOs => write!(f, "implicit OS-specific key in [passphrase] section"),
             GetterSource::ImplicitSops => write!(f, "implicit sops key in [passphrase] section"),
         }
     }
@@ -73,8 +75,14 @@ fn resolve_passphrase(args: &cli::Args, repo: &impl Repository) -> Result<()> {
                 }
             }
             Err(_) => {
-                // Env var not set, fall through to sops check
-                if cfg.has_passphrase_key("sops") {
+                // Env var not set, check OS-specific key first
+                let os_key = if cfg!(target_os = "macos") { "macos" }
+                             else if cfg!(target_os = "linux") { "linux" }
+                             else { "" };
+
+                if !os_key.is_empty() && cfg.has_passphrase_key(os_key) {
+                    (Some(os_key.to_string()), Some(GetterSource::ImplicitOs))
+                } else if cfg.has_passphrase_key("sops") {
                     (Some("sops".to_string()), Some(GetterSource::ImplicitSops))
                 } else {
                     (None, None)
