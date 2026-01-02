@@ -1,6 +1,3 @@
-[submodule "[dev]/...playground"]
-	path = [dev]/...playground
-	url = https://github.com/bobuid/_..etc..git-agecrypt-playground.git
 [submodule "[dev]/_..playground"]
 	path = [dev]/_..playground
 	url = https://github.com/bobuid/_..etc..git-agecrypt-playground.git

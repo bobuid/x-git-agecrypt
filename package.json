@@ -1,6 +1,6 @@
 {
   "name": "x-git-agecrypt.monorepo",
-  "version": "0.2512.1-b",
+  "version": "0.2601.1-c",
   "private": false,
   "#readme": [
     "The follwing effectively working commands under the 'scripts' section you are supposed to use like 'bun run build'",
