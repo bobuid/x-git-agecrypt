@@ -1,6 +1,6 @@
 [package]
 name = "git-agecrypt"
-version = "0.2.0-xa"
+version = "0.2.0-xc"
 edition = "2021"
 description = "Git encryption tool using age"
 
